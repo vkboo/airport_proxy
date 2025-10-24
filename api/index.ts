@@ -25,6 +25,41 @@ app.get('/', (c) => {
   return c.text('Not Found', 404);
 });
 
+// 密码认证中间件
+app.use('/primary', async (c, next) => {
+  const password = c.req.query('password');
+  const validPassword = process.env.PASSWORD;
+  
+  if (!validPassword) {
+    console.log('PASSWORD 环境变量未设置');
+    return c.text('Service Unavailable', 503);
+  }
+  
+  if (!password || password !== validPassword) {
+    console.log('无效的密码');
+    return c.text('Unauthorized', 401);
+  }
+  
+  await next();
+});
+
+app.use('/backup', async (c, next) => {
+  const password = c.req.query('password');
+  const validPassword = process.env.PASSWORD;
+  
+  if (!validPassword) {
+    console.log('PASSWORD 环境变量未设置');
+    return c.text('Service Unavailable', 503);
+  }
+  
+  if (!password || password !== validPassword) {
+    console.log('无效的密码');
+    return c.text('Unauthorized', 401);
+  }
+  
+  await next();
+});
+
 // 添加安全头
 app.use('*', async (c, next) => {
   // 设置安全头

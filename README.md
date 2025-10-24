@@ -20,7 +20,7 @@ npm install
 
 ### 2. 配置环境变量
 
-复制 `env.example` 为 `.env` 并填入你的订阅链接：
+复制 `env.example` 为 `.env` 并填入你的订阅链接和API密钥：
 
 ```bash
 cp env.example .env
@@ -31,6 +31,7 @@ cp env.example .env
 ```env
 PRIMARY_URL=https://your-primary-subscription-url.com/subscription
 BACKUP_URL=https://your-backup-subscription-url.com/subscription
+PASSWORD=your-secure-password-here
 ```
 
 ### 3. 本地开发
@@ -48,24 +49,25 @@ npm run dev
 3. 在 Vercel 项目设置中添加环境变量：
    - `PRIMARY_URL`: 你的主订阅链接
    - `BACKUP_URL`: 你的备用订阅链接（可选）
+   - `PASSWORD`: 你的访问密码（用于保护订阅端点）
 
 ## API 端点
 
-| 端点 | 描述 | 用途 |
-|------|------|------|
-| `GET /` | 服务信息 | 查看服务状态和可用端点 |
-| `GET /primary` | 主订阅链接 | 客户端使用此端点获取主订阅 |
-| `GET /backup` | 备用订阅链接 | 客户端使用此端点获取备用订阅 |
-| `GET /health` | 健康检查 | 监控服务状态 |
+| 端点 | 描述 | 认证 | 用途 |
+|------|------|------|------|
+| `GET /` | 服务信息 | ❌ | 查看服务状态和可用端点 |
+| `GET /primary` | 主订阅链接 | ✅ | 客户端使用此端点获取主订阅 |
+| `GET /backup` | 备用订阅链接 | ✅ | 客户端使用此端点获取备用订阅 |
+| `GET /health` | 健康检查 | ❌ | 监控服务状态 |
 
 ## 使用方式
 
 ### 在客户端中配置
 
-将原来的订阅链接替换为：
+将原来的订阅链接替换为（需要包含访问密码）：
 
-- **主订阅**: `https://your-domain.vercel.app/primary`
-- **备用订阅**: `https://your-domain.vercel.app/backup`
+- **主订阅**: `https://your-domain.vercel.app/primary?password=your-password`
+- **备用订阅**: `https://your-domain.vercel.app/backup?password=your-password`
 
 ### 支持的客户端
 
@@ -114,6 +116,7 @@ npm run build
 |--------|------|------|
 | `PRIMARY_URL` | ✅ | 主订阅链接 |
 | `BACKUP_URL` | ❌ | 备用订阅链接 |
+| `PASSWORD` | ✅ | 访问密码（保护订阅端点） |
 | `PORT` | ❌ | 本地开发端口（默认 3000） |
 | `NODE_ENV` | ❌ | 运行环境 |
 
