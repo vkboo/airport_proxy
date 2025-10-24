@@ -2,6 +2,7 @@
   "name": "airport-proxy",
   "version": "1.0.0",
   "description": "机场订阅链接代理服务",
+  "type": "module",
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx src/index.ts",
