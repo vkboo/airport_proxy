@@ -20,17 +20,9 @@ async function fetchSubscription(url: string): Promise<Response> {
   }
 }
 
-// 主路由 - 服务说明
+// 主路由 - 返回 404 隐藏服务信息
 app.get('/', (c) => {
-  return c.json({
-    service: '机场订阅代理服务',
-    version: '1.0.0',
-    endpoints: {
-      '/primary': '主订阅链接',
-      '/backup': '备用订阅链接'
-    },
-    usage: '在客户端中使用这些端点替换原始订阅链接'
-  });
+  return c.text('Not Found', 404);
 });
 
 // 主订阅链接
