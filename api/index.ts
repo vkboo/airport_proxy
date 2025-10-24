@@ -25,14 +25,25 @@ app.get('/', (c) => {
   return c.text('Not Found', 404);
 });
 
+// 添加安全头
+app.use('*', async (c, next) => {
+  // 设置安全头
+  c.header('X-Content-Type-Options', 'nosniff');
+  c.header('X-Frame-Options', 'DENY');
+  c.header('X-XSS-Protection', '1; mode=block');
+  c.header('Cache-Control', 'no-cache, no-store, must-revalidate');
+  c.header('Pragma', 'no-cache');
+  c.header('Expires', '0');
+  
+  await next();
+});
+
 // 主订阅链接
 app.get('/primary', async (c) => {
   const primaryUrl = process.env.PRIMARY_URL;
   
   if (!primaryUrl) {
-    return c.json({ 
-      error: 'PRIMARY_URL 环境变量未设置' 
-    }, 500);
+    return c.text('Service Unavailable', 503);
   }
 
   try {
@@ -43,13 +54,14 @@ app.get('/primary', async (c) => {
     const contentType = response.headers.get('content-type') || 'text/plain';
     c.header('Content-Type', contentType);
     
+    // 不记录敏感内容到日志
+    console.log('主订阅请求成功');
+    
     return c.text(content);
   } catch (error) {
-    console.error('主订阅获取失败:', error);
-    return c.json({ 
-      error: '无法获取主订阅内容',
-      details: error instanceof Error ? error.message : '未知错误'
-    }, 502);
+    // 不记录具体错误信息到日志
+    console.log('主订阅获取失败');
+    return c.text('Service Unavailable', 503);
   }
 });
 
@@ -58,9 +70,7 @@ app.get('/backup', async (c) => {
   const backupUrl = process.env.BACKUP_URL;
   
   if (!backupUrl) {
-    return c.json({ 
-      error: 'BACKUP_URL 环境变量未设置' 
-    }, 500);
+    return c.text('Service Unavailable', 503);
   }
 
   try {
@@ -71,13 +81,14 @@ app.get('/backup', async (c) => {
     const contentType = response.headers.get('content-type') || 'text/plain';
     c.header('Content-Type', contentType);
     
+    // 不记录敏感内容到日志
+    console.log('备用订阅请求成功');
+    
     return c.text(content);
   } catch (error) {
-    console.error('备用订阅获取失败:', error);
-    return c.json({ 
-      error: '无法获取备用订阅内容',
-      details: error instanceof Error ? error.message : '未知错误'
-    }, 502);
+    // 不记录具体错误信息到日志
+    console.log('备用订阅获取失败');
+    return c.text('Service Unavailable', 503);
   }
 });
 
