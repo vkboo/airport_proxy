@@ -1,0 +1,29 @@
+{
+  "name": "airport-proxy",
+  "version": "1.0.0",
+  "description": "机场订阅链接代理服务",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "keywords": [
+    "proxy",
+    "subscription",
+    "hono",
+    "vercel"
+  ],
+  "author": "tyounami",
+  "license": "MIT",
+  "dependencies": {
+    "dotenv": "^17.2.3",
+    "hono": "^4.0.0"
+  },
+  "devDependencies": {
+    "@hono/node-server": "^1.8.0",
+    "@types/node": "^20.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0"
+  }
+}
