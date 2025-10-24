@@ -82,10 +82,8 @@ npm run dev
 
 ```
 airport_proxy/
-├── src/
-│   └── index.ts          # 核心应用逻辑
 ├── api/
-│   └── index.ts          # Vercel 部署入口
+│   └── index.ts          # 应用逻辑（本地开发和生产环境共用）
 ├── package.json
 ├── tsconfig.json
 ├── vercel.json

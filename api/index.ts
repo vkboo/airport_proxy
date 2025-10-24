@@ -136,3 +136,14 @@ app.get('/health', (c) => {
 });
 
 export default app;
+
+// 本地开发服务器
+if (process.env.NODE_ENV !== 'production') {
+  const { serve } = await import('@hono/node-server');
+  const port = process.env.PORT || 3000;
+  console.log(`🚀 服务器启动在 http://localhost:${port}`);
+  serve({
+    fetch: app.fetch,
+    port: Number(port)
+  });
+}
