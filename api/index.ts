@@ -1,15 +1,24 @@
 import { Hono } from 'hono';
 import { config } from 'dotenv';
+import { Agent } from 'undici';
 
-// 加载环境变量
 config();
 
 const app = new Hono();
 
-// 获取订阅内容的辅助函数
-async function fetchSubscription(url: string): Promise<Response> {
+const insecureAgent = new Agent({
+  connect: {
+    rejectUnauthorized: false,
+  },
+});
+
+async function fetchSubscription(url: string, skipTLS = false): Promise<Response> {
   try {
-    const response = await fetch(url);
+    const options: RequestInit & { dispatcher?: Agent } = {};
+    if (skipTLS) {
+      options.dispatcher = insecureAgent;
+    }
+    const response = await fetch(url, options as any);
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
@@ -82,7 +91,7 @@ app.get('/primary', async (c) => {
   }
 
   try {
-    const response = await fetchSubscription(primaryUrl);
+    const response = await fetchSubscription(primaryUrl, true);
     const content = await response.text();
     
     // 设置正确的 Content-Type
@@ -109,19 +118,16 @@ app.get('/backup', async (c) => {
   }
 
   try {
-    const response = await fetchSubscription(backupUrl);
+    const response = await fetchSubscription(backupUrl, true);
     const content = await response.text();
     
-    // 设置正确的 Content-Type
     const contentType = response.headers.get('content-type') || 'text/plain';
     c.header('Content-Type', contentType);
     
-    // 不记录敏感内容到日志
     console.log('备用订阅请求成功');
     
     return c.text(content);
   } catch (error) {
-    // 不记录具体错误信息到日志
     console.log('备用订阅获取失败');
     return c.text('Service Unavailable', 503);
   }
