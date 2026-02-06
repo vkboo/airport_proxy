@@ -12,21 +12,32 @@ const insecureAgent = new Agent({
   },
 });
 
-async function fetchSubscription(url: string, skipTLS = false): Promise<Response> {
-  try {
-    const options: RequestInit & { dispatcher?: Agent } = {};
-    if (skipTLS) {
-      options.dispatcher = insecureAgent;
+function buildForwardUrl(c: any, targetUrl: string): string {
+  const upstreamUrl = new URL(targetUrl);
+  const incomingUrl = new URL(c.req.url);
+  for (const [key, value] of incomingUrl.searchParams.entries()) {
+    if (key !== 'password') {
+      upstreamUrl.searchParams.append(key, value);
     }
-    const response = await fetch(url, options as any);
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
-    return response;
-  } catch (error) {
-    console.error(`获取订阅失败 (${url}):`, error);
-    throw error;
   }
+  return upstreamUrl.toString();
+}
+
+function buildForwardHeaders(c: any): Headers {
+  const headers = new Headers(c.req.raw.headers);
+  headers.delete('host');
+  headers.delete('content-length');
+  return headers;
+}
+
+async function forwardGet(c: any, targetUrl: string): Promise<Response> {
+  const url = buildForwardUrl(c, targetUrl);
+  const headers = buildForwardHeaders(c);
+  return fetch(url, {
+    method: 'GET',
+    headers,
+    dispatcher: insecureAgent,
+  } as any);
 }
 
 // 主路由 - 返回 404 隐藏服务信息
@@ -35,43 +46,50 @@ app.get('/', (c) => {
 });
 
 // 密码认证中间件
-app.use('/primary', async (c, next) => {
-  const password = c.req.query('password');
-  const validPassword = process.env.PASSWORD;
-  
+function verifyPassword(c: any): boolean | Response {
+  const password = c.req.query('password')?.trim();
+  const validPassword = process.env.PASSWORD?.trim();
+
   if (!validPassword) {
-    console.log('PASSWORD 环境变量未设置');
-    return c.text('Service Unavailable', 503);
+    console.log('PASSWORD 环境变量未设置, 所有环境变量键:', Object.keys(process.env).filter(k => k.includes('PASS') || k.includes('pass')));
+    return false;
   }
-  
+
   if (!password || password !== validPassword) {
-    console.log('无效的密码');
+    console.log(`密码验证失败 - 收到长度: ${password?.length ?? 0}, 期望长度: ${validPassword.length}`);
+    return false;
+  }
+
+  return true;
+}
+
+app.use('/primary', async (c, next) => {
+  const result = verifyPassword(c);
+  if (result !== true) {
+    const validPassword = process.env.PASSWORD?.trim();
+    if (!validPassword) return c.text('Service Unavailable', 503);
     return c.text('Unauthorized', 401);
   }
-  
   await next();
 });
 
 app.use('/backup', async (c, next) => {
-  const password = c.req.query('password');
-  const validPassword = process.env.PASSWORD;
-  
-  if (!validPassword) {
-    console.log('PASSWORD 环境变量未设置');
-    return c.text('Service Unavailable', 503);
-  }
-  
-  if (!password || password !== validPassword) {
-    console.log('无效的密码');
+  const result = verifyPassword(c);
+  if (result !== true) {
+    const validPassword = process.env.PASSWORD?.trim();
+    if (!validPassword) return c.text('Service Unavailable', 503);
     return c.text('Unauthorized', 401);
   }
-  
   await next();
 });
 
 // 添加安全头
 app.use('*', async (c, next) => {
-  // 设置安全头
+  const pathname = new URL(c.req.url).pathname;
+  if (pathname === '/primary' || pathname === '/backup') {
+    await next();
+    return;
+  }
   c.header('X-Content-Type-Options', 'nosniff');
   c.header('X-Frame-Options', 'DENY');
   c.header('X-XSS-Protection', '1; mode=block');
@@ -91,19 +109,13 @@ app.get('/primary', async (c) => {
   }
 
   try {
-    const response = await fetchSubscription(primaryUrl, true);
-    const content = await response.text();
-    
-    // 设置正确的 Content-Type
-    const contentType = response.headers.get('content-type') || 'text/plain';
-    c.header('Content-Type', contentType);
-    
-    // 不记录敏感内容到日志
-    console.log('主订阅请求成功');
-    
-    return c.text(content);
+    const response = await forwardGet(c, primaryUrl);
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: response.headers,
+    });
   } catch (error) {
-    // 不记录具体错误信息到日志
     console.log('主订阅获取失败');
     return c.text('Service Unavailable', 503);
   }
@@ -118,15 +130,12 @@ app.get('/backup', async (c) => {
   }
 
   try {
-    const response = await fetchSubscription(backupUrl, true);
-    const content = await response.text();
-    
-    const contentType = response.headers.get('content-type') || 'text/plain';
-    c.header('Content-Type', contentType);
-    
-    console.log('备用订阅请求成功');
-    
-    return c.text(content);
+    const response = await forwardGet(c, backupUrl);
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: response.headers,
+    });
   } catch (error) {
     console.log('备用订阅获取失败');
     return c.text('Service Unavailable', 503);
