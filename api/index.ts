@@ -24,9 +24,22 @@ function buildForwardUrl(c: any, targetUrl: string): string {
 }
 
 function buildForwardHeaders(c: any): Headers {
-  const headers = new Headers(c.req.raw.headers);
-  headers.delete('host');
-  headers.delete('content-length');
+  const headers = new Headers();
+  const accept = c.req.header('accept');
+  const acceptLanguage = c.req.header('accept-language');
+  const userAgent = c.req.header('user-agent');
+
+  headers.set('accept', accept || '*/*');
+
+  if (acceptLanguage) {
+    headers.set('accept-language', acceptLanguage);
+  }
+
+  headers.set(
+    'user-agent',
+    userAgent || 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+  );
+
   return headers;
 }
 
@@ -61,6 +74,35 @@ function verifyPassword(c: any): boolean | Response {
   }
 
   return true;
+}
+
+async function logUpstreamResponse(routeName: string, response: Response, targetUrl: string): Promise<void> {
+  const diagnostic: Record<string, string | number | null> = {
+    route: routeName,
+    status: response.status,
+    contentType: response.headers.get('content-type'),
+    server: response.headers.get('server'),
+    location: response.headers.get('location'),
+    cacheStatus: response.headers.get('cf-cache-status') || response.headers.get('x-cache'),
+    targetHost: new URL(targetUrl).host,
+  };
+
+  if (response.ok) {
+    console.log('上游请求完成', diagnostic);
+    return;
+  }
+
+  let bodyPreview = '';
+  try {
+    bodyPreview = (await response.clone().text()).slice(0, 200);
+  } catch (error) {
+    bodyPreview = `[读取响应体失败: ${error instanceof Error ? error.message : 'unknown error'}]`;
+  }
+
+  console.log('上游请求异常', {
+    ...diagnostic,
+    bodyPreview,
+  });
 }
 
 app.use('/primary', async (c, next) => {
@@ -110,6 +152,7 @@ app.get('/primary', async (c) => {
 
   try {
     const response = await forwardGet(c, primaryUrl);
+    await logUpstreamResponse('primary', response, primaryUrl);
     return new Response(response.body, {
       status: response.status,
       statusText: response.statusText,
@@ -131,6 +174,7 @@ app.get('/backup', async (c) => {
 
   try {
     const response = await forwardGet(c, backupUrl);
+    await logUpstreamResponse('backup', response, backupUrl);
     return new Response(response.body, {
       status: response.status,
       statusText: response.statusText,
