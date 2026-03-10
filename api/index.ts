@@ -76,6 +76,46 @@ function verifyPassword(c: any): boolean | Response {
   return true;
 }
 
+function maskSensitiveValue(value: string | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+
+  if (value.length <= 4) {
+    return `${'*'.repeat(value.length)} (${value.length})`;
+  }
+
+  return `${value.slice(0, 2)}***${value.slice(-2)} (${value.length})`;
+}
+
+function logIncomingRequest(c: any): void {
+  const url = new URL(c.req.url);
+  const query = Object.fromEntries(
+    Array.from(url.searchParams.entries()).map(([key, value]) => [
+      key,
+      key === 'password' ? maskSensitiveValue(value) : value,
+    ])
+  );
+
+  console.log('收到请求', {
+    method: c.req.method,
+    url: c.req.url,
+    pathname: url.pathname,
+    query,
+    headers: {
+      accept: c.req.header('accept') || null,
+      'accept-language': c.req.header('accept-language') || null,
+      'user-agent': c.req.header('user-agent') || null,
+      'x-forwarded-for': c.req.header('x-forwarded-for') || null,
+      'x-forwarded-host': c.req.header('x-forwarded-host') || null,
+      'x-forwarded-proto': c.req.header('x-forwarded-proto') || null,
+      'cf-connecting-ip': c.req.header('cf-connecting-ip') || null,
+      'cf-ipcountry': c.req.header('cf-ipcountry') || null,
+      host: c.req.header('host') || null,
+    },
+  });
+}
+
 async function logUpstreamResponse(routeName: string, response: Response, targetUrl: string): Promise<void> {
   const diagnostic: Record<string, string | number | null> = {
     route: routeName,
@@ -104,6 +144,11 @@ async function logUpstreamResponse(routeName: string, response: Response, target
     bodyPreview,
   });
 }
+
+app.use('*', async (c, next) => {
+  logIncomingRequest(c);
+  await next();
+});
 
 app.use('/primary', async (c, next) => {
   const result = verifyPassword(c);
