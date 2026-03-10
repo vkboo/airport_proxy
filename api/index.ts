@@ -43,14 +43,15 @@ function buildForwardHeaders(c: any): Headers {
   return headers;
 }
 
-async function forwardGet(c: any, targetUrl: string): Promise<Response> {
-  const url = buildForwardUrl(c, targetUrl);
+async function forwardGet(c: any, targetUrl: string): Promise<{ response: Response; upstreamUrl: string }> {
+  const upstreamUrl = buildForwardUrl(c, targetUrl);
   const headers = buildForwardHeaders(c);
-  return fetch(url, {
+  const response = await fetch(upstreamUrl, {
     method: 'GET',
     headers,
     dispatcher: insecureAgent,
   } as any);
+  return { response, upstreamUrl };
 }
 
 // 主路由 - 返回 404 隐藏服务信息
@@ -116,7 +117,7 @@ function logIncomingRequest(c: any): void {
   });
 }
 
-async function logUpstreamResponse(routeName: string, response: Response, targetUrl: string): Promise<void> {
+async function logUpstreamResponse(routeName: string, response: Response, targetUrl: string, upstreamUrl: string): Promise<void> {
   const diagnostic: Record<string, string | number | null> = {
     route: routeName,
     status: response.status,
@@ -125,6 +126,7 @@ async function logUpstreamResponse(routeName: string, response: Response, target
     location: response.headers.get('location'),
     cacheStatus: response.headers.get('cf-cache-status') || response.headers.get('x-cache'),
     targetHost: new URL(targetUrl).host,
+    upstreamUrl,
   };
 
   if (response.ok) {
@@ -196,8 +198,8 @@ app.get('/primary', async (c) => {
   }
 
   try {
-    const response = await forwardGet(c, primaryUrl);
-    await logUpstreamResponse('primary', response, primaryUrl);
+    const { response, upstreamUrl } = await forwardGet(c, primaryUrl);
+    await logUpstreamResponse('primary', response, primaryUrl, upstreamUrl);
     return new Response(response.body, {
       status: response.status,
       statusText: response.statusText,
@@ -218,8 +220,8 @@ app.get('/backup', async (c) => {
   }
 
   try {
-    const response = await forwardGet(c, backupUrl);
-    await logUpstreamResponse('backup', response, backupUrl);
+    const { response, upstreamUrl } = await forwardGet(c, backupUrl);
+    await logUpstreamResponse('backup', response, backupUrl, upstreamUrl);
     return new Response(response.body, {
       status: response.status,
       statusText: response.statusText,
